@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 from pymatgen.io.cifio import CifParser
 from pymatgen.core.structure import Structure
-from pymatgen.defects.point_defects import Interstitial
+from pymatgen.defects.point_defects import Interstitial, InterstitialFormationEnergy
 from pymatgen.defects.point_defects import StructWithValenceIonicRadius
 from pymatgen.symmetry.finder import SymmetryFinder
 
@@ -139,7 +139,7 @@ def inter_descript_gen(cif_file, prune_args):
         print 'reading ', cif_file, ' failed'
         return None, filen
 
-    symm_finder = SymmetryFinder(struct)
+    symm_finder = SymmetryFinder(struct, symprec=1e-1)
     inter_descript_dict['crystal_system'] = symm_finder.get_crystal_system()
     inter_descript_dict['spacegroup_no'] = symm_finder.get_spacegroup_number()
     no_symmops = len(symm_finder.get_symmetry_operations())
@@ -187,19 +187,27 @@ def inter_descript_gen(cif_file, prune_args):
     else:
         el = prune_args[0]
         oxi_state = prune_args[1]
+        print el, oxi_state
         inter.prune_defectsites(el, oxi_state)
     inter.prune_close_defectsites()
 
     if inter.defectsite_count() > 10:
+    # Something wrong with the symmetry reduction of defects. 
+    # Ignoring the outlier
+        return None, filen
         inter.reduce_defectsites()
     no_inter = inter.defectsite_count()
+    if no_inter > 5:
+        print "Tag:", key, inter_descript_dict['formula'], no_inter
     inter_descript_dict['no_inter'] = no_inter
     #print >>sys.stderr, inter_descript_dict[key]['formula'], "No. of inter", no_inter
+    #ife = InterstitialFormationEnergy(inter)
 
     #Create a list storing a dictionary of properties for each interstitial
     inter_list = []
     for i in range(no_inter):
         inter_dict = {}
+        inter_dict['coords'] = inter.get_defectsite(i).coords
         inter_dict['coord_no'] = inter.get_defectsite_coordination_number(i)
         inter_dict['coord_el'] = list(inter.get_coordinated_elements(i))
         inter_dict['radius'] = inter.get_radius(i)
@@ -227,25 +235,25 @@ def coord_no_vs_inter_radius(inter_descript_dict):
 
 if __name__ == '__main__':
     inter_cation_prune_dict, failed_struct = gen_inter_descript(
-            'Binary oxide dataset/20130524/comp_structures', 'cation'
+            'Binary oxide dataset/20130524/comp_structures', ('cation',)
             )
     dump = json.dumps(inter_cation_prune_dict)
     with open('inter_prop_cation_prune.json', 'w') as fp:
         fp.write(dump)
 
-    inter_anion_prune_dict, failed_struct = gen_inter_descript(
-            'Binary oxide dataset/20130524/comp_structures', 'anion'
-            )
-    dump = json.dumps(inter_anion_prune_dict)
-    with open('inter_prop_anion_prune.json', 'w') as fp:
-        fp.write(dump)
+    #inter_anion_prune_dict, failed_struct = gen_inter_descript(
+    #        'Binary oxide dataset/20130524/comp_structures', ('anion',)
+    #        )
+    #dump = json.dumps(inter_anion_prune_dict)
+    #with open('inter_prop_anion_prune.json', 'w') as fp:
+    #    fp.write(dump)
 
-    inter_Li_prune_dict, failed_struct = gen_inter_descript(
-            'Binary oxide dataset/20130524/comp_structures', ('Li',1)
-            )
-    dump = json.dumps(inter_Li_prune_dict)
-    with open('inter_prop_Li_prune.json', 'w') as fp:
-        fp.write(dump)
+    #inter_Li_prune_dict, failed_struct = gen_inter_descript(
+    #        'Binary oxide dataset/20130524/comp_structures', ('Li',1)
+    #        )
+    #dump = json.dumps(inter_Li_prune_dict)
+    #with open('inter_prop_Li_prune.json', 'w') as fp:
+    #    fp.write(dump)
     print failed_struct
     #print struct_inter_dict
     #coord_no_vs_inter_radius(struct_inter_dict)
